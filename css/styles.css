@@ -1,0 +1,35 @@
+body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; }
+
+#ui-container {
+    position: absolute;
+    top: 15px; left: 15px;
+    color: #00ffcc;
+    background: rgba(0, 15, 30, 0.9);
+    padding: 20px;
+    border: 1px solid #0055ff;
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(0, 85, 255, 0.3);
+    z-index: 100;
+    pointer-events: none; /* Permite clickear la escena 3D detrás */
+    min-width: 280px;
+}
+
+h2 { margin: 0 0 15px 0; font-size: 18px; color: #ffffff; text-transform: uppercase; letter-spacing: 1px; }
+
+.data-row { margin: 8px 0; font-size: 14px; display: flex; justify-content: space-between; }
+.data-value { font-weight: bold; color: #ffffff; }
+
+#instructions {
+    position: absolute;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    color: #ddd;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 12px 25px;
+    border-radius: 30px;
+    border: 1px solid #444;
+    text-align: center;
+    z-index: 100;
+    pointer-events: none;
+    font-size: 14px;
+}

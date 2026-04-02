@@ -35,17 +35,24 @@ class ArowService {
         return this.currentData;
     }
 
-    // Generador de trayectoria translunar para hoy (1 de Abril 2026) si la API falla
+// Generador de trayectoria translunar (Free-Return Figure-8)
     generateMockData() {
         this.isSimulating = true;
-        this.mockTime += 0.05; // Incremento de tiempo simulado
+        this.mockTime += 0.001; // Velocidad de simulación
         
-        // Simulación de Inyección Translunar (TLI)
-        let x = this.mockTime * 150000; 
-        let y = Math.sin(this.mockTime * 2) * 15000;
-        let z = Math.cos(this.mockTime) * 10000;
+        if (this.mockTime > 1) {
+            this.mockTime = 0; // Reinicia ciclo completo
+            // Para evitar el cruce de líneas, emitimos un evento custom
+            window.dispatchEvent(new Event('orbitReset')); 
+        }
+
+        // 't' va de 0 a 2*PI
+        let t = this.mockTime * Math.PI * 2;
         
-        if (x > 380000) this.mockTime = 0; // Reinicia cerca de la Luna
+        // Ecuaciones paramétricas de retorno libre hacia la Luna (X = 384,400)
+        let x = (1 - Math.cos(t)) * 210000;  // Alcanza hasta X=420,000 (rodea la Luna)
+        let y = Math.sin(t) * 80000;         // Arco de ida y vuelta
+        let z = Math.sin(t / 2) * 15000;     // Ligera inclinación orbital
 
         let distEarth = Math.sqrt(x*x + y*y + z*z);
         let distMoon = Math.sqrt(Math.pow(384400 - x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
@@ -54,7 +61,7 @@ class ArowService {
             x: x, y: y, z: z,
             distEarth: distEarth,
             distMoon: distMoon,
-            speed: 39500 - (this.mockTime * 2000) // Desaceleración en ruta
+            speed: 39500 - (Math.abs(Math.sin(t)) * 10000)
         };
     }
 }

@@ -4,11 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Artemis II Launch - Telemetría AROW VR</title>
-    <!-- A-Frame (Versión estable) -->
+    
+    <!-- 1. DEPENDENCIA PRINCIPAL (Debe cargar primero y bloquear el parseo hasta estar lista) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     
-    <!-- Módulos del Proyecto -->
+    <!-- 2. HOJA DE ESTILOS -->
     <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- 3. MÓDULOS DEL PROYECTO (En estricto orden de dependencia) -->
+    <!-- blender-controls y telemetry dependen de AFRAME (ya cargado arriba) -->
+    <script src="js/blender-controls.js"></script>
+    <!-- api-service no depende de A-Frame, pero telemetry-component depende de api-service -->
     <script src="js/api-service.js"></script>
     <script src="js/telemetry-component.js"></script>
 </head>
@@ -27,45 +33,74 @@
 
     <!-- Instrucciones de Navegación -->
     <div id="instructions">
-        <strong>NAVEGACIÓN VR/PC:</strong> Mantén Click Izquierdo para orientar la vista | Usa <strong>W A S D</strong> para desplazarte libremente en 3D.
+        <strong>NAVEGACIÓN VR/PC:</strong> Mantén Click Izq para orientar | <strong>WASD</strong> para mover | Click en planeta para seleccionar.
     </div>
 
-    <!-- Escena A-Frame -->
-    <!-- artemis-tracker inicia la conexión AROW y gestiona la nave -->
-    <a-scene artemis-tracker="scaleFactor: 100000; updateInterval: 2000" background="color: #000000">
+    <!-- ESCENA A-FRAME -->
+    <!-- Se inician los componentes registrados en el <head> -->
+    <a-scene artemis-tracker="scaleFactor: 100000; updateInterval: 2000" 
+             blender-controls 
+             starfield 
+             cursor="rayOrigin: mouse" 
+             raycaster="objects: .clickable" 
+             background="color: #000000">
         
         <a-assets>
-            <img id="earth-map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Land_ocean_ice_2048.jpg/1024px-Land_ocean_ice_2048.jpg" crossorigin="anonymous">
-            <img id="moon-map" src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Moonmap_from_clementine_data.png/1024px-Moonmap_from_clementine_data.png" crossorigin="anonymous">
+            <!-- Asegúrate de tener los archivos .glb en una carpeta llamada 'assets' junto a tu index.html -->
+            <a-asset-item id="earth-model" src="assets/tierra.gltf"></a-asset-item>
+            <a-asset-item id="moon-model" src="assets/luna.gltf"></a-asset-item>
+            <a-asset-item id="orion-model" src="assets/orion.glb"></a-asset-item>
         </a-assets>
 
-        <!-- Iluminación Realista -->
-        <a-light type="directional" color="#ffffff" intensity="1.8" position="-10 2 0"></a-light>
-        <a-light type="ambient" color="#111111"></a-light>
+        <!-- EL SOL (Iluminación y representación) -->
+        <a-entity id="sun" position="-500 0 -500">
+            <a-sphere radius="10" material="color: #ffffee; shader: flat;"></a-sphere>
+            <a-light type="point" color="#ffffff" intensity="2" distance="2000" decay="0"></a-light>
+        </a-entity>
+        <!-- Luz ambiental tenue para ver la parte oscura de los planetas -->
+        <a-light type="ambient" color="#0a0a1a" intensity="0.5"></a-light>
 
-        <!-- TIERRA: Diámetro real 12,756.27 km -> VR Radio: 0.06378 m -->
-        <a-sphere id="earth-sphere" position="0 0 0" radius="0.06378" src="#earth-map" 
-                  animation="property: rotation; to: 0 360 0; loop: true; dur: 86400; easing: linear">
-        </a-sphere>
+        <!-- LA TIERRA (.glb + Inclinación Orbital + Raycaster) -->
+        <!-- La clase 'clickable' permite que el raycaster la detecte para usar Numpad (.) y Alt+Click -->
+        <a-entity id="earth-container" position="0 0 0" rotation="23.5 0 0">
+            <!-- HITBOX: Esfera transparente matemáticamente perfecta para el clic -->
+            <a-sphere id="hitbox-earth" class="clickable" data-name="TIERRA" radius="0.08" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
+            
+            <a-entity gltf-model="#earth-model" scale="0.12756 0.12756 0.12756" 
+                      animation="property: rotation; to: 0 360 0; loop: true; dur: 86400; easing: linear">
+            </a-entity>
 
-        <!-- LUNA: Diámetro real 3,474.8 km -> VR Radio: 0.01737 m | Distancia 384,400 km -> VR Pos: X=3.844 m -->
-        <a-sphere id="moon-sphere" position="3.844 0 0" radius="0.01737" src="#moon-map"
-                  animation="property: rotation; to: 0 360 0; loop: true; dur: 2332800; easing: linear">
-        </a-sphere>
-
-        <!-- NAVE ORION (Controlada por el script artemis-tracker) -->
-        <!-- Se dimensiona un poco más grande de la escala real para que el ojo humano pueda verla -->
-        <a-entity id="orion-ship" position="0.1 0 0">
-            <a-cone color="#silver" radius-bottom="0.005" height="0.01" rotation="-90 0 0"></a-cone>
-            <a-cylinder color="#0055ff" radius="0.006" height="0.002" position="0 0 0.005"></a-cylinder>
-            <a-light type="point" color="#00ffcc" intensity="0.5" distance="0.2"></a-light>
+            <!-- LETRERO DINÁMICO (Crece y decrece según la distancia) -->
+            <a-entity dynamic-label="text: TIERRA; baseScale: 0.1" position="0 0.12 0"></a-entity>
         </a-entity>
 
-        <!-- CÁMARA (Vuelo 3D activado) -->
-        <!-- 'fly: true' rompe el eje Y, permitiendo navegar como astronauta -->
-        <a-entity camera look-controls="pointerLockEnabled: false" 
-                  wasd-controls="fly: true; acceleration: 0.3" 
-                  position="-0.2 0.1 0.3">
+        <!-- LA LUNA (.glb + Hitbox + Letrero Dinámico) -->
+        <a-entity id="moon-container" position="3.844 0 0" rotation="1.54 0 0">
+            <!-- HITBOX LUNA -->
+            <a-sphere id="hitbox-moon" class="clickable" data-name="LUNA" radius="0.025" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
+            
+            <a-entity gltf-model="#moon-model" scale="0.03474 0.03474 0.03474"
+                      animation="property: rotation; to: 0 360 0; loop: true; dur: 2332800; easing: linear">
+            </a-entity>
+
+            <!-- LETRERO DINÁMICO LUNA -->
+            <a-entity dynamic-label="text: LUNA; baseScale: 0.1" position="0 0.05 0"></a-entity>
+        </a-entity>
+
+        <!-- NAVE ORION (+ Hitbox + Letrero) -->
+        <a-entity id="orion-ship" position="0.1 0 0">
+            <!-- HITBOX NAVE -->
+            <a-sphere id="hitbox-orion" class="clickable" data-name="ORION" radius="0.02" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
+            
+            <a-entity gltf-model="#orion-model" scale="0.005 0.005 0.005"></a-entity>
+            
+            <!-- LETRERO DINÁMICO NAVE -->
+            <a-entity dynamic-label="text: ORION; baseScale: 0.05" position="0 0.03 0"></a-entity>
+        </a-entity>
+
+        <!-- CÁMARA VR / NAVEGACIÓN -->
+        <a-entity id="rig" position="-0.2 0.1 0.5">
+            <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: true; acceleration: 30"></a-camera>
         </a-entity>
 
     </a-scene>

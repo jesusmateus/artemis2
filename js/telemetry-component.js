@@ -116,7 +116,7 @@ AFRAME.registerComponent('artemis-tracker', {
     updateUIStatus: function() {
         if (!this.uiStatus) return;
         if (window.arowService.isSimulating) {
-            this.uiStatus.innerText = "SIMULACIÓN (AROW Offline / Calculando UTC)";
+            this.uiStatus.innerText = "SIMULATION (AROW Offline / Calculating UTC)";
             this.uiStatus.style.color = "#ff9900"; 
         } else {
             this.uiStatus.innerText = "DATOS EN VIVO (AROW)";

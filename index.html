@@ -17,18 +17,36 @@
     <!-- api-service no depende de A-Frame, pero telemetry-component depende de api-service -->
     <script src="js/api-service.js"></script>
     <script src="js/telemetry-component.js"></script>
+    <script>
+        // disable right click
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.onkeydown = function (e) {            
+            if(e.keyCode == 123) {
+                return false;
+            }// disable F12 key            
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 73){
+                return false;
+            }// disable I key            
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 74) {
+                return false;
+            }// disable J key       
+            if(e.ctrlKey && e.keyCode == 85) {
+                return false;
+            }// disable U key
+        }
+    </script>
 </head>
 <body>
 
     <!-- Panel UI (HUD) -->
     <div id="ui-container">
         <h2>🚀 Artemis II - AROW</h2>
-        <div class="data-row"><span>Dist. a la Tierra:</span> <span class="data-value"><span id="dist-earth">---</span> km</span></div>
-        <div class="data-row"><span>Dist. a la Luna:</span> <span class="data-value"><span id="dist-moon">---</span> km</span></div>
-        <div class="data-row"><span>Velocidad (Rel):</span> <span class="data-value"><span id="speed">---</span> km/h</span></div>
+        <div class="data-row"><span>Dist. from Earth:</span> <span class="data-value"><span id="dist-earth">---</span> km</span></div>
+        <div class="data-row"><span>Dist. from Moon:</span> <span class="data-value"><span id="dist-moon">---</span> km</span></div>
+        <div class="data-row"><span>Speed (Rel):</span> <span class="data-value"><span id="speed">---</span> km/h</span></div>
         <hr style="border-color: #0055ff; margin: 10px 0;">
-        <div class="data-row"><span>Estado Link:</span> <span class="data-value" id="data-status">Conectando...</span></div>
-        <div class="data-row"><span>Tasa Extracción:</span> <span class="data-value" id="ping-rate">---</span></div>
+        <div class="data-row"><span>Link Status:</span> <span class="data-value" id="data-status">Conecting...</span></div>
+        <div class="data-row"><span>Extraction Rate:</span> <span class="data-value" id="ping-rate">---</span></div>
     </div>
 
     <!-- Instrucciones de Navegación -->
@@ -50,6 +68,9 @@
             <a-asset-item id="earth-model" src="assets/tierra.gltf"></a-asset-item>
             <a-asset-item id="moon-model" src="assets/luna.gltf"></a-asset-item>
             <a-asset-item id="orion-model" src="assets/orion.glb"></a-asset-item>
+
+            <img id="a2_alert_01" src="/assets/a2_alert_01.png">
+            <img id="a2_alert_02" src="/assets/a2_alert_02.png">
         </a-assets>
 
         <!-- EL SOL (Iluminación y representación) -->
@@ -96,6 +117,12 @@
             
             <!-- LETRERO DINÁMICO NAVE -->
             <a-entity dynamic-label="text: ORION; baseScale: 0.05" position="0 0.03 0"></a-entity>
+        </a-entity>
+        
+            <!-- Alerta e instrucciones -->
+        <a-entity>
+            <a-image src="#a2_alert_01" scale="1.8 1.5 1.8" position="0 -1.5 3 " rotation="270 0 0"></a-image>
+            <a-image src="#a2_alert_02" scale="1.5 1.8 1.8" position="1.5 -.45 3" rotation="0 270 0"></a-image>
         </a-entity>
 
         <!-- CÁMARA VR / NAVEGACIÓN -->

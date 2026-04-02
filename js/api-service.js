@@ -1,70 +1,79 @@
 /**
- * Servicio de conexión a AROW (Artemis Real-time Orbit Website)
- * Extrae vectores de estado X, Y, Z y telemetría de la misión.
+ * Servicio de Telemetría AROW - Arquitectura Determinista basada en Tiempo UTC
  */
 class ArowService {
     constructor() {
-        // Endpoint oficial/estimado de AROW para Artemis II
-        this.apiUrl = 'https://data.nasa.gov/api/artemis/telemetry/latest';
-        this.currentData = null;
-        this.isSimulating = false; // Fallback si la API está caída
-        this.mockTime = 0;
+        // Endpoint teórico esperado para AROW Artemis II. Puede variar según los protocolos de NASA hoy.
+        this.apiUrl = 'https://client.arow.nasa.gov/api/v1/telemetry/latest';
+        this.isSimulating = true;
+        
+        // HORA CERO EXACTA: 1 de Abril de 2026 (Ajusta la hora UTC según el despegue oficial)
+        // Ejemplo: 14:00:00 UTC
+        this.launchDateMs = new Date('2026-04-01T14:00:00Z').getTime();
+        
+        // Duración teórica de la misión Artemis II: ~10 días en milisegundos
+        this.missionDurationMs = 10 * 24 * 60 * 60 * 1000; 
     }
 
     async fetchTelemetry() {
         try {
-            // En un entorno de producción estricto, validar CORS.
-            const response = await fetch(this.apiUrl);
-            if (!response.ok) throw new Error('API AROW no disponible');
+            // Intentamos conectar con la telemetría en vivo. 'cache: no-store' evita datos viejos.
+            const response = await fetch(this.apiUrl, { cache: "no-store" });
+            if (!response.ok) throw new Error('API AROW inaccesible o bloqueada por CORS');
             
             const data = await response.json();
-            // Estructura esperada de AROW J2000
-            this.currentData = {
-                x: data.x, // en km
-                y: data.y, // en km
-                z: data.z, // en km
+            this.isSimulating = false;
+            
+            return {
+                x: data.x, y: data.y, z: data.z,
                 distEarth: data.distanceFromEarth,
                 distMoon: data.distanceFromMoon,
                 speed: data.relativeVelocity
             };
-            this.isSimulating = false;
         } catch (error) {
-            console.warn("Fallo al conectar con AROW. Usando simulador orbital de respaldo (TLI).");
-            this.generateMockData();
+            // Si la API falla (lo más probable en un entorno frontend sin proxy), 
+            // entra el Simulador Determinista de precisión temporal.
+            this.isSimulating = true;
+            return this.getDeterministicState(Date.now());
         }
-        return this.currentData;
     }
 
-// Generador de trayectoria translunar (Free-Return Figure-8)
-    generateMockData() {
-        this.isSimulating = true;
-        this.mockTime += 0.001; // Velocidad de simulación
-        
-        if (this.mockTime > 1) {
-            this.mockTime = 0; // Reinicia ciclo completo
-            // Para evitar el cruce de líneas, emitimos un evento custom
-            window.dispatchEvent(new Event('orbitReset')); 
+    /**
+     * Calcula la posición exacta de la nave basándose estrictamente en el reloj mundial.
+     * @param {number} currentTimeMs - Timestamp actual
+     */
+    getDeterministicState(currentTimeMs) {
+        let elapsedMs = currentTimeMs - this.launchDateMs;
+
+        // 1. Si aún no hemos despegado (antes de la hora cero)
+        if (elapsedMs < 0) {
+            return { x: 0.1, y: 0, z: 0, distEarth: 0, distMoon: 384400, speed: 0 };
         }
 
-        // 't' va de 0 a 2*PI
-        let t = this.mockTime * Math.PI * 2;
-        
-        // Ecuaciones paramétricas de retorno libre hacia la Luna (X = 384,400)
-        let x = (1 - Math.cos(t)) * 210000;  // Alcanza hasta X=420,000 (rodea la Luna)
-        let y = Math.sin(t) * 80000;         // Arco de ida y vuelta
-        let z = Math.sin(t / 2) * 15000;     // Ligera inclinación orbital
+        // 2. Si la misión ya terminó (Splashdown)
+        if (elapsedMs > this.missionDurationMs) {
+            return { x: 0.1, y: 0, z: 0, distEarth: 0, distMoon: 384400, speed: 0 };
+        }
+
+        // 3. Mapeo del progreso (t va de 0 a 1 durante los 10 días)
+        let t = elapsedMs / this.missionDurationMs;
+        let pi = Math.PI;
+
+        // Ecuaciones paramétricas de la "Free-Return Trajectory" ajustadas a 10 días
+        // El punto más lejano (apogeo lunar) ocurre aproximadamente a la mitad (t = ~0.4 a 0.5)
+        let x = Math.sin(t * pi) * 400000;       // Llega hasta 400,000 km y vuelve a 0
+        let y = Math.sin(t * 2 * pi) * 40000;    // Dibuja el arco del "8" en el eje Y
+        let z = Math.sin(t * pi) * 15000;        // Inclinación orbital respecto a la eclíptica
 
         let distEarth = Math.sqrt(x*x + y*y + z*z);
+        // Distancia a la luna (centro lunar en X = 384400, Y = 0, Z = 0)
         let distMoon = Math.sqrt(Math.pow(384400 - x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
 
-        this.currentData = {
-            x: x, y: y, z: z,
-            distEarth: distEarth,
-            distMoon: distMoon,
-            speed: 39500 - (Math.abs(Math.sin(t)) * 10000)
-        };
+        // Cálculo de velocidad (mayor cerca de la Tierra ~39000 km/h, menor cerca de la Luna ~5000 km/h)
+        let speed = 40000 - (Math.abs(Math.sin(t * pi)) * 35000);
+
+        return { x: x, y: y, z: z, distEarth: distEarth, distMoon: distMoon, speed: speed };
     }
 }
 
-// Exportar globalmente para A-Frame
 window.arowService = new ArowService();

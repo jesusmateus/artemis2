@@ -1,11 +1,7 @@
-/**
- * Componente A-Frame para el seguimiento de la nave Orión.
- * Renderiza la trayectoria (Path) e interpola la posición en VR.
- */
 AFRAME.registerComponent('artemis-tracker', {
     schema: {
-        scaleFactor: {type: 'number', default: 100000}, // 1 metro VR = 100,000 km reales
-        updateInterval: {type: 'number', default: 3000} // Consulta a la API cada 3 segundos
+        scaleFactor: {type: 'number', default: 100000}, 
+        updateInterval: {type: 'number', default: 3000} 
     },
 
     init: function () {
@@ -14,40 +10,28 @@ AFRAME.registerComponent('artemis-tracker', {
         this.lastFetchTime = 0;
         this.pathPoints =[];
         
-        // 1. Configuración de la trayectoria (Three.js Line) altamente optimizada
-        const material = new THREE.LineBasicMaterial({ 
-            color: 0xff3300, 
-            linewidth: 2, 
-            transparent: true, 
-            opacity: 0.8 
-        });
-        
-        // Usamos BufferGeometry por ser el estándar para alto rendimiento en WebGL
+        // Material de la trayectoria
+        const material = new THREE.LineBasicMaterial({ color: 0xff3300, linewidth: 2, transparent: true, opacity: 0.8 });
         this.geometry = new THREE.BufferGeometry();
-        this.positions = new Float32Array(3000); // Pre-asignamos memoria para 1000 vértices (x,y,z)
+        this.positions = new Float32Array(3000); // 1000 puntos máximo
         this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
         
         this.line = new THREE.Line(this.geometry, material);
         this.el.sceneEl.object3D.add(this.line);
 
-        // 2. Referencias a los elementos del DOM (HUD UI)
+        // UI
         this.uiEarth = document.getElementById('dist-earth');
         this.uiMoon = document.getElementById('dist-moon');
         this.uiSpeed = document.getElementById('speed');
         this.uiStatus = document.getElementById('data-status');
         this.uiPing = document.getElementById('ping-rate');
 
-        // 3. --- CORRECCIÓN DE BUCLE ORBITAL ---
-        // Escucha el evento disparado por api-service.js cuando la simulación
-        // de la trayectoria en forma de 8 se reinicia.
-        window.addEventListener('orbitReset', () => {
-            this.pathPoints =[]; // Vaciamos el array de puntos
-            this.line.geometry.setDrawRange(0, 0); // Ocultamos la línea dibujada
-        });
+        // Generar la línea roja del pasado ANTES del primer render
+        this.precomputeHistoricalPath();
     },
 
-    tick: function (time, timeDelta) {
-        // A. Polling asíncrono a la API (o simulador) según el updateInterval
+    tick: function (time) {
+        // Polling cada 3 segundos
         if (time - this.lastFetchTime > this.data.updateInterval) {
             window.arowService.fetchTelemetry().then(data => {
                 if (data) this.updateTarget(data);
@@ -56,27 +40,18 @@ AFRAME.registerComponent('artemis-tracker', {
             this.lastFetchTime = time;
         }
 
-        // B. Interpolación Lineal (Lerp) para movimiento VR fluido
-        // En lugar de "teletransportar" la nave cada 3 segundos, la movemos un
-        // 5% de la distancia hacia su objetivo real en cada frame (60 FPS).
+        // Interpolación fluida
         if (this.ship && this.ship.object3D) {
             this.ship.object3D.position.lerp(this.targetPosition, 0.05);
         }
 
-        // C. Actualización del trazado en el espacio 3D
         this.updatePath();
     },
 
     updateTarget: function(data) {
-        // Transformación del Vector de Estado (Km) a la Escala VR (Metros)
         let scale = this.data.scaleFactor;
-        this.targetPosition.set(
-            data.x / scale,
-            data.y / scale,
-            data.z / scale
-        );
+        this.targetPosition.set(data.x / scale, data.y / scale, data.z / scale);
 
-        // Actualizar UI formateando los números astronómicos a estilo europeo/latino
         if(this.uiEarth) this.uiEarth.innerText = data.distEarth.toLocaleString('es-ES', {maximumFractionDigits: 1});
         if(this.uiMoon) this.uiMoon.innerText = data.distMoon.toLocaleString('es-ES', {maximumFractionDigits: 1});
         if(this.uiSpeed) this.uiSpeed.innerText = data.speed.toLocaleString('es-ES', {maximumFractionDigits: 1});
@@ -87,41 +62,65 @@ AFRAME.registerComponent('artemis-tracker', {
 
         let currentPos = this.ship.object3D.position;
         
-        // Optimización de la VRAM: Solo agrega un vértice a la línea si la nave 
-        // se ha desplazado más de 0.01 unidades VR desde el último punto.
+        // Dibuja un punto solo si la nave se movió significativamente
         if (this.pathPoints.length === 0 || currentPos.distanceTo(this.pathPoints[this.pathPoints.length - 1]) > 0.01) {
-            
-            // FIFO (First In, First Out) - Si llegamos a 1000 puntos, borramos el más viejo
-            // Esto evita caídas de FPS (Frame Drops) por exceso de geometría.
-            if (this.pathPoints.length >= 1000) {
-                this.pathPoints.shift(); 
-            }
-            
+            if (this.pathPoints.length >= 1000) this.pathPoints.shift(); 
             this.pathPoints.push(currentPos.clone());
-            
-            // Volcado rápido del array de objetos Vector3 a Float32Array para WebGL
-            for (let i = 0; i < this.pathPoints.length; i++) {
-                this.positions[i * 3] = this.pathPoints[i].x;
-                this.positions[i * 3 + 1] = this.pathPoints[i].y;
-                this.positions[i * 3 + 2] = this.pathPoints[i].z;
-            }
-            
-            // Banderas necesarias para que Three.js sepa que debe re-renderizar la geometría
-            this.line.geometry.attributes.position.needsUpdate = true;
-            this.line.geometry.setDrawRange(0, this.pathPoints.length);
+            this.flushPathToGPU();
         }
+    },
+
+    // NUEVA FUNCIÓN: Dibuja la línea desde el despegue hasta AHORA
+    precomputeHistoricalPath: function() {
+        if (!window.arowService.isSimulating) return; // Si la API real funciona, dejamos que la API guíe.
+        
+        let now = Date.now();
+        let launch = window.arowService.launchDateMs;
+        if (now <= launch) return; // Aún no ha despegado
+
+        let elapsed = now - launch;
+        let intervals = 500; // Queremos 500 puntos en el historial
+        let stepMs = elapsed / intervals;
+        
+        let scale = this.data.scaleFactor;
+
+        for (let i = 0; i <= intervals; i++) {
+            let timeSim = launch + (stepMs * i);
+            let state = window.arowService.getDeterministicState(timeSim);
+            
+            this.pathPoints.push(new THREE.Vector3(
+                state.x / scale,
+                state.y / scale,
+                state.z / scale
+            ));
+        }
+        
+        // Poner la nave inmediatamente al final de la línea para evitar saltos iniciales
+        let lastPoint = this.pathPoints[this.pathPoints.length - 1];
+        this.ship.object3D.position.copy(lastPoint);
+        this.targetPosition.copy(lastPoint);
+        
+        this.flushPathToGPU();
+    },
+
+    flushPathToGPU: function() {
+        for (let i = 0; i < this.pathPoints.length; i++) {
+            this.positions[i * 3] = this.pathPoints[i].x;
+            this.positions[i * 3 + 1] = this.pathPoints[i].y;
+            this.positions[i * 3 + 2] = this.pathPoints[i].z;
+        }
+        this.line.geometry.attributes.position.needsUpdate = true;
+        this.line.geometry.setDrawRange(0, this.pathPoints.length);
     },
 
     updateUIStatus: function() {
         if (!this.uiStatus) return;
-        
-        // Indicador semántico del estado de los datos
         if (window.arowService.isSimulating) {
-            this.uiStatus.innerText = "SIMULACIÓN (AROW Offline)";
-            this.uiStatus.style.color = "#ff9900"; // Naranja de advertencia
+            this.uiStatus.innerText = "SIMULACIÓN (AROW Offline / Calculando UTC)";
+            this.uiStatus.style.color = "#ff9900"; 
         } else {
             this.uiStatus.innerText = "DATOS EN VIVO (AROW)";
-            this.uiStatus.style.color = "#00ffcc"; // Cyan de OK
+            this.uiStatus.style.color = "#00ffcc"; 
         }
         if(this.uiPing) this.uiPing.innerText = `${this.data.updateInterval} ms`;
     }

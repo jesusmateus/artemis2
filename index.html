@@ -8,11 +8,13 @@
     <link rel="shortcut icon" href="assets/mateus_3d_favicon.png">
     <!-- 1. DEPENDENCIA PRINCIPAL (Debe cargar primero y bloquear el parseo hasta estar lista) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/styles.css?v=1.0.1">
+    <script src="js/cache-manager.js?v=1.0.1"></script>
     <script src="js/blender-controls.js"></script>
     <!-- api-service no depende de A-Frame, pero telemetry-component depende de api-service -->
     <script src="js/api-service.js"></script>
     <script src="js/telemetry-component.js"></script>
+    <script src="js/optical-flare.js?v=1.0.1"></script>
     <script>
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.onkeydown = function (e) {            
@@ -46,7 +48,7 @@
 
     <!-- Instrucciones de Navegación -->
     <div id="instructions">
-        <strong>VR/PC NAVIGATION:</strong> Hold Left Click to aim | <strong>WASD:</strong> to move | Click on planet to select | <strong>ORBIT:</strong> scroll click | <strong>Autor</strong> Jesús Mateus
+        Press <strong>F5</strong> or Refresh | <strong>VR/PC NAVIGATION:</strong> Hold Left Click to aim | <strong>WASD:</strong> to move | Click on planet to select | <strong>ORBIT:</strong> scroll click | <strong>Autor</strong> Jesús Mateus
     </div>
 
     <!-- ESCENA A-FRAME -->
@@ -68,10 +70,10 @@
             <img id="a2_alert_02" src="assets/a2_alert_02.png">
         </a-assets>
 
-        <!-- EL SOL (Iluminación y representación) -->
-        <a-entity id="sun" position="-500 0 -500">
-            <a-sphere radius="10" material="color: #ffffee; shader: flat;"></a-sphere>
-            <a-light type="point" color="#ffffff" intensity="3" distance="2000" decay="0"></a-light>
+        <!-- EL SOL (Con Lens Flare / Bloom Procedimental integrado) -->
+        <a-entity id="sun" position="-500 0 -500" solar-flare>
+            <a-sphere radius="10" material="color: #ffffff; shader: flat;"></a-sphere>
+            <a-light type="point" color="#ffffff" intensity="2" distance="3000" decay="0.5"></a-light>
         </a-entity>
         <!-- Luz ambiental tenue para ver la parte oscura de los planetas -->
         <a-light type="ambient" color="#0a0a1a" intensity="0.5"></a-light>

@@ -4,7 +4,6 @@
 		"version":"2.0"
 	},
 	"extensionsUsed":[
-		"KHR_materials_transmission",
 		"KHR_materials_specular",
 		"KHR_materials_ior"
 	],
@@ -31,12 +30,16 @@
 	],
 	"materials":[
 		{
-			"alphaMode":"BLEND",
 			"doubleSided":true,
+			"emissiveFactor":[
+				1,
+				1,
+				1
+			],
+			"emissiveTexture":{
+				"index":0
+			},
 			"extensions":{
-				"KHR_materials_transmission":{
-					"transmissionFactor":0.30000001192092896
-				},
 				"KHR_materials_specular":{
 					"specularColorFactor":[
 						1.2000000476837158,
@@ -48,25 +51,25 @@
 					"ior":1.4500000476837158
 				}
 			},
-			"name":"Earth_Diffuse_6K.006",
+			"name":"Earth_Diffuse_6K",
 			"normalTexture":{
-				"index":0,
+				"index":1,
 				"scale":0.6000000238418579
 			},
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":1
+					"index":2
 				},
 				"metallicFactor":0,
 				"metallicRoughnessTexture":{
-					"index":2
+					"index":3
 				}
 			}
 		}
 	],
 	"meshes":[
 		{
-			"name":"Earth_Diffuse_6K.003",
+			"name":"Earth_Diffuse_6K.002",
 			"primitives":[
 				{
 					"attributes":{
@@ -86,29 +89,38 @@
 			"source":0
 		},
 		{
-			"sampler":1,
+			"sampler":0,
 			"source":1
 		},
 		{
 			"sampler":1,
 			"source":2
+		},
+		{
+			"sampler":1,
+			"source":3
 		}
 	],
 	"images":[
 		{
 			"mimeType":"image/jpeg",
-			"name":"Earth_NormalNRM_6K",
-			"uri":"Earth_NormalNRM_6K.jpg"
+			"name":"Earth_Illumination_hd",
+			"uri":"Earth_Illumination_hd.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"Earth_NormalNRM_hd",
+			"uri":"Earth_NormalNRM_hd.jpg"
+		},
+		{
+			"mimeType":"image/jpeg",
+			"name":"Earth_Diffuse_hd",
+			"uri":"Earth_Diffuse_hd.jpg"
 		},
 		{
 			"mimeType":"image/png",
-			"name":"Earth_Diffuse_6K",
-			"uri":"Earth_Diffuse_6K.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"Earth_Glossiness_6K",
-			"uri":"Earth_Glossiness_6K.png"
+			"name":"Earth_Glossiness_hd",
+			"uri":"Earth_Glossiness_hd.png"
 		}
 	],
 	"accessors":[
@@ -117,13 +129,13 @@
 			"componentType":5126,
 			"count":3942,
 			"max":[
-				0.5000239610671997,
+				0.5000240206718445,
 				0.5004211068153381,
 				0.4999094009399414
 			],
 			"min":[
-				-0.4999760389328003,
-				-0.49957895278930664,
+				-0.4999760687351227,
+				-0.49957892298698425,
 				-0.5000905990600586
 			],
 			"type":"VEC3"

@@ -73,8 +73,8 @@
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"lroc_color_poles_8k",
-			"uri":"lroc_color_poles_8k.png"
+			"name":"lroc_color_poles_hd",
+			"uri":"lroc_color_poles_hd.png"
 		}
 	],
 	"accessors":[

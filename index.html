@@ -4,21 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Artemis II Launch - Telemetría AROW VR</title>
-    
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/mateus_3d_favicon.png">
+    <link rel="shortcut icon" href="assets/mateus_3d_favicon.png">
     <!-- 1. DEPENDENCIA PRINCIPAL (Debe cargar primero y bloquear el parseo hasta estar lista) -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    
-    <!-- 2. HOJA DE ESTILOS -->
     <link rel="stylesheet" href="css/styles.css">
-    
-    <!-- 3. MÓDULOS DEL PROYECTO (En estricto orden de dependencia) -->
-    <!-- blender-controls y telemetry dependen de AFRAME (ya cargado arriba) -->
     <script src="js/blender-controls.js"></script>
     <!-- api-service no depende de A-Frame, pero telemetry-component depende de api-service -->
     <script src="js/api-service.js"></script>
     <script src="js/telemetry-component.js"></script>
     <script>
-        // disable right click
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.onkeydown = function (e) {            
             if(e.keyCode == 123) {

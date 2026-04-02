@@ -33,7 +33,7 @@
 
     <!-- Instrucciones de Navegación -->
     <div id="instructions">
-        <strong>NAVEGACIÓN VR/PC:</strong> Mantén Click Izq para orientar | <strong>WASD</strong> para mover | Click en planeta para seleccionar.
+        <strong>VR/PC NAVIGATION:</strong> Hold Left Click to aim | <strong>WASD:</strong> to move | Click on planet to select | <strong>ORBIT:</strong> scroll click
     </div>
 
     <!-- ESCENA A-FRAME -->
@@ -55,23 +55,23 @@
         <!-- EL SOL (Iluminación y representación) -->
         <a-entity id="sun" position="-500 0 -500">
             <a-sphere radius="10" material="color: #ffffee; shader: flat;"></a-sphere>
-            <a-light type="point" color="#ffffff" intensity="2" distance="2000" decay="0"></a-light>
+            <a-light type="point" color="#ffffff" intensity="3" distance="2000" decay="0"></a-light>
         </a-entity>
         <!-- Luz ambiental tenue para ver la parte oscura de los planetas -->
         <a-light type="ambient" color="#0a0a1a" intensity="0.5"></a-light>
 
         <!-- LA TIERRA (.glb + Inclinación Orbital + Raycaster) -->
         <!-- La clase 'clickable' permite que el raycaster la detecte para usar Numpad (.) y Alt+Click -->
-        <a-entity id="earth-container" position="0 0 0" rotation="23.5 0 0">
+        <a-entity id="earth-container" position="-0.03 0 0" rotation="23.5 0 0">
             <!-- HITBOX: Esfera transparente matemáticamente perfecta para el clic -->
             <a-sphere id="hitbox-earth" class="clickable" data-name="TIERRA" radius="0.08" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
             
             <a-entity gltf-model="#earth-model" scale="0.12756 0.12756 0.12756" 
-                      animation="property: rotation; to: 0 360 0; loop: true; dur: 86400; easing: linear">
+                      animation="property: rotation; to: 0 360 0; loop: true; dur: 864000; easing: linear">
             </a-entity>
 
             <!-- LETRERO DINÁMICO (Crece y decrece según la distancia) -->
-            <a-entity dynamic-label="text: TIERRA; baseScale: 0.1" position="0 0.12 0"></a-entity>
+            <a-entity dynamic-label="text: EARTH; baseScale: 0.1" position="0 0.12 0"></a-entity>
         </a-entity>
 
         <!-- LA LUNA (.glb + Hitbox + Letrero Dinámico) -->
@@ -84,7 +84,7 @@
             </a-entity>
 
             <!-- LETRERO DINÁMICO LUNA -->
-            <a-entity dynamic-label="text: LUNA; baseScale: 0.1" position="0 0.05 0"></a-entity>
+            <a-entity dynamic-label="text: MOON; baseScale: 0.1" position="0 0.05 0"></a-entity>
         </a-entity>
 
         <!-- NAVE ORION (+ Hitbox + Letrero) -->
@@ -99,8 +99,8 @@
         </a-entity>
 
         <!-- CÁMARA VR / NAVEGACIÓN -->
-        <a-entity id="rig" position="-0.2 0.1 0.5">
-            <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: true; acceleration: 30"></a-camera>
+        <a-entity id="rig" position="0 -1.5 3">
+            <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: true; acceleration: 15"></a-camera>
         </a-entity>
 
     </a-scene>

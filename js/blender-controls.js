@@ -166,6 +166,6 @@ AFRAME.registerComponent('blender-controls', {
         this.cameraEl.setAttribute('look-controls', 'enabled', true);
         this.cameraEl.setAttribute('wasd-controls', 'enabled', true);
         document.getElementById('instructions').innerHTML = 
-            "NAVEGACIÓN VR/PC: Mantén Click Izq para orientar | <strong>WASD</strong> para mover | Click en planeta para seleccionar.";
+            "VR/PC NAVIGATION: Hold Left Click to aim | <strong>WASD</strong> to move | <strong>Orbit</strong> scroll click | Click en planeta para seleccionar.";
     }
 });

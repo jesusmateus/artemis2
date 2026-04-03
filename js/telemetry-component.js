@@ -1,37 +1,35 @@
 AFRAME.registerComponent('artemis-tracker', {
-    schema: {
-        scaleFactor: {type: 'number', default: 100000}, 
-        updateInterval: {type: 'number', default: 3000} 
-    },
+    schema: { scaleFactor: {type: 'number', default: 100000}, updateInterval: {type: 'number', default: 3000} },
 
     init: function () {
         this.ship = document.querySelector('#orion-ship');
         this.targetPosition = new THREE.Vector3(0, 0, 0);
         this.lastFetchTime = 0;
-        this.pathPoints =[];
         
-        // Material de la trayectoria
-        const material = new THREE.LineBasicMaterial({ color: 0xff3300, linewidth: 2, transparent: true, opacity: 0.8 });
-        this.geometry = new THREE.BufferGeometry();
-        this.positions = new Float32Array(3000); // 1000 puntos máximo
-        this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-        
-        this.line = new THREE.Line(this.geometry, material);
-        this.el.sceneEl.object3D.add(this.line);
+        // DOS TRAYECTORIAS SEPARADAS (Pasado y Futuro)
+        this.pastPoints =[];
+        this.futurePoints =[];
 
-        // UI
+        // Geometría Pasada (Línea Roja sólida)
+        this.pastGeom = new THREE.BufferGeometry();
+        this.pastLine = new THREE.Line(this.pastGeom, new THREE.LineBasicMaterial({ color: 0xff3300, linewidth: 2 }));
+        
+        // Geometría Futura (Línea Cyan translúcida)
+        this.futureGeom = new THREE.BufferGeometry();
+        this.futureLine = new THREE.Line(this.futureGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3 }));
+        
+        this.el.sceneEl.object3D.add(this.pastLine);
+        this.el.sceneEl.object3D.add(this.futureLine);
+
         this.uiEarth = document.getElementById('dist-earth');
         this.uiMoon = document.getElementById('dist-moon');
         this.uiSpeed = document.getElementById('speed');
         this.uiStatus = document.getElementById('data-status');
-        this.uiPing = document.getElementById('ping-rate');
 
-        // Generar la línea roja del pasado ANTES del primer render
-        this.precomputeHistoricalPath();
+        this.precomputeHistoricalAndFuturePath();
     },
 
     tick: function (time) {
-        // Polling cada 3 segundos
         if (time - this.lastFetchTime > this.data.updateInterval) {
             window.arowService.fetchTelemetry().then(data => {
                 if (data) this.updateTarget(data);
@@ -40,12 +38,9 @@ AFRAME.registerComponent('artemis-tracker', {
             this.lastFetchTime = time;
         }
 
-        // Interpolación fluida
         if (this.ship && this.ship.object3D) {
             this.ship.object3D.position.lerp(this.targetPosition, 0.05);
         }
-
-        this.updatePath();
     },
 
     updateTarget: function(data) {
@@ -57,71 +52,52 @@ AFRAME.registerComponent('artemis-tracker', {
         if(this.uiSpeed) this.uiSpeed.innerText = data.speed.toLocaleString('es-ES', {maximumFractionDigits: 1});
     },
 
-    updatePath: function() {
-        if (!this.ship || !this.ship.object3D) return;
-
-        let currentPos = this.ship.object3D.position;
-        
-        // Dibuja un punto solo si la nave se movió significativamente
-        if (this.pathPoints.length === 0 || currentPos.distanceTo(this.pathPoints[this.pathPoints.length - 1]) > 0.01) {
-            if (this.pathPoints.length >= 1000) this.pathPoints.shift(); 
-            this.pathPoints.push(currentPos.clone());
-            this.flushPathToGPU();
-        }
-    },
-
-    // NUEVA FUNCIÓN: Dibuja la línea desde el despegue hasta AHORA
-    precomputeHistoricalPath: function() {
-        if (!window.arowService.isSimulating) return; // Si la API real funciona, dejamos que la API guíe.
-        
+    precomputeHistoricalAndFuturePath: function() {
         let now = Date.now();
         let launch = window.arowService.launchDateMs;
-        if (now <= launch) return; // Aún no ha despegado
-
-        let elapsed = now - launch;
-        let intervals = 500; // Queremos 500 puntos en el historial
-        let stepMs = elapsed / intervals;
-        
+        let duration = window.arowService.missionDurationMs;
         let scale = this.data.scaleFactor;
+        
+        let intervals = 600; // Resolución del dibujo
+        let stepMs = duration / intervals;
 
         for (let i = 0; i <= intervals; i++) {
             let timeSim = launch + (stepMs * i);
             let state = window.arowService.getDeterministicState(timeSim);
-            
-            this.pathPoints.push(new THREE.Vector3(
-                state.x / scale,
-                state.y / scale,
-                state.z / scale
-            ));
-        }
-        
-        // Poner la nave inmediatamente al final de la línea para evitar saltos iniciales
-        let lastPoint = this.pathPoints[this.pathPoints.length - 1];
-        this.ship.object3D.position.copy(lastPoint);
-        this.targetPosition.copy(lastPoint);
-        
-        this.flushPathToGPU();
-    },
+            let pos = new THREE.Vector3(state.x / scale, state.y / scale, state.z / scale);
 
-    flushPathToGPU: function() {
-        for (let i = 0; i < this.pathPoints.length; i++) {
-            this.positions[i * 3] = this.pathPoints[i].x;
-            this.positions[i * 3 + 1] = this.pathPoints[i].y;
-            this.positions[i * 3 + 2] = this.pathPoints[i].z;
+            if (timeSim <= now) {
+                this.pastPoints.push(pos);
+            } else {
+                this.futurePoints.push(pos);
+            }
         }
-        this.line.geometry.attributes.position.needsUpdate = true;
-        this.line.geometry.setDrawRange(0, this.pathPoints.length);
+        
+        // Actualizar los Buffers de WebGL
+        this.pastGeom.setFromPoints(this.pastPoints);
+        
+        // Para que las líneas conecten, el primer punto futuro es el último del pasado
+        if (this.pastPoints.length > 0) {
+            this.futurePoints.unshift(this.pastPoints[this.pastPoints.length - 1]);
+        }
+        this.futureGeom.setFromPoints(this.futurePoints);
+        
+        // Ubicar la nave en el tiempo presente (final de la línea roja)
+        if (this.pastPoints.length > 0) {
+            let currentRealPos = this.pastPoints[this.pastPoints.length - 1];
+            this.ship.object3D.position.copy(currentRealPos);
+            this.targetPosition.copy(currentRealPos);
+        }
     },
 
     updateUIStatus: function() {
         if (!this.uiStatus) return;
         if (window.arowService.isSimulating) {
-            this.uiStatus.innerText = "SIMULATION (AROW Offline / Calculating UTC)";
+            this.uiStatus.innerText = "UTC CALCULATION (AROW API Blocked/Offline)";
             this.uiStatus.style.color = "#ff9900"; 
         } else {
-            this.uiStatus.innerText = "DATOS EN VIVO (AROW)";
+            this.uiStatus.innerText = "LIVE DATA (AROW Connected)";
             this.uiStatus.style.color = "#00ffcc"; 
         }
-        if(this.uiPing) this.uiPing.innerText = `${this.data.updateInterval} ms`;
     }
 });

@@ -6,30 +6,30 @@
     <title>Artemis II Launch - Telemetría AROW VR</title>
     <link rel="icon" type="image/png" sizes="16x16" href="assets/mateus_3d_favicon.png">
     <link rel="shortcut icon" href="assets/mateus_3d_favicon.png">
-    <!-- 1. DEPENDENCIA PRINCIPAL (Debe cargar primero y bloquear el parseo hasta estar lista) -->
+    
+    <!-- 1. DEPENDENCIA PRINCIPAL -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <link rel="stylesheet" href="css/styles.css?v=1.0.1">
+    
+    <!-- 2. MÓDULOS DE INGENIERÍA Y TELEMETRÍA -->
     <script src="js/cache-manager.js?v=1.0.1"></script>
-    <script src="js/blender-controls.js"></script>
-    <!-- api-service no depende de A-Frame, pero telemetry-component depende de api-service -->
-    <script src="js/api-service.js"></script>
-    <script src="js/telemetry-component.js"></script>
+    <script src="js/blender-controls.js?v=1.0.2"></script>
+    <script src="js/api-service.js?v=1.0.2"></script>
+    <script src="js/telemetry-component.js?v=1.0.2"></script>
     <script src="js/optical-flare.js?v=1.0.1"></script>
+    
+    <!-- 3. NUEVOS MÓDULOS DE MECÁNICA ORBITAL (Añadidos) -->
+    <script src="js/ephemeris-engine.js?v=1.0.2"></script>
+    <script src="js/solar-system-component.js?v=1.0.2"></script>
+
+    <!-- 4. SEGURIDAD FRONTEND -->
     <script>
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.onkeydown = function (e) {            
-            if(e.keyCode == 123) {
-                return false;
-            }// disable F12 key            
-            if(e.ctrlKey && e.shiftKey && e.keyCode == 73){
-                return false;
-            }// disable I key            
-            if(e.ctrlKey && e.shiftKey && e.keyCode == 74) {
-                return false;
-            }// disable J key       
-            if(e.ctrlKey && e.keyCode == 85) {
-                return false;
-            }// disable U key
+            if(e.keyCode == 123) return false; // disable F12 key            
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 73) return false; // disable I key            
+            if(e.ctrlKey && e.shiftKey && e.keyCode == 74) return false; // disable J key       
+            if(e.ctrlKey && e.keyCode == 85) return false; // disable U key
         }
     </script>
 </head>
@@ -42,26 +42,26 @@
         <div class="data-row"><span>Dist. from Moon:</span> <span class="data-value"><span id="dist-moon">---</span> km</span></div>
         <div class="data-row"><span>Speed (Rel):</span> <span class="data-value"><span id="speed">---</span> km/h</span></div>
         <hr style="border-color: #0055ff; margin: 10px 0;">
-        <div class="data-row"><span>Link Status:</span> <span class="data-value" id="data-status">Conecting...</span></div>
+        <div class="data-row"><span>Link Status:</span> <span class="data-value" id="data-status">Connecting...</span></div>
         <div class="data-row"><span>Extraction Rate:</span> <span class="data-value" id="ping-rate">---</span></div>
     </div>
 
     <!-- Instrucciones de Navegación -->
     <div id="instructions">
-        Press <strong>F5</strong> or Refresh | <strong>VR/PC NAVIGATION:</strong> Hold Left Click to aim | <strong>WASD:</strong> to move | Click on planet to select | <strong>ORBIT:</strong> scroll click | <strong>Autor</strong> Jesús Mateus
+        <strong>VR/PC NAVIGATION:</strong> Hold Left Click to aim | <strong>WASD:</strong> to move | Click on planet to select | <strong>ORBIT:</strong> scroll click | <strong>Autor</strong> Jesús Mateus
     </div>
 
-    <!-- ESCENA A-FRAME -->
-    <!-- Se inician los componentes registrados en el <head> -->
-    <a-scene artemis-tracker="scaleFactor: 100000; updateInterval: 2000" 
+    <!-- ESCENA A-FRAME (Atributo cosmic-environment añadido) -->
+    <a-scene renderer="colorManagement: true;"
+             artemis-tracker="scaleFactor: 100000; updateInterval: 2000" 
              blender-controls 
              starfield 
+             cosmic-environment 
              cursor="rayOrigin: mouse" 
              raycaster="objects: .clickable" 
              background="color: #000000">
         
         <a-assets>
-            <!-- Asegúrate de tener los archivos .glb en una carpeta llamada 'assets' junto a tu index.html -->
             <a-asset-item id="earth-model" src="assets/tierra.gltf"></a-asset-item>
             <a-asset-item id="moon-model" src="assets/luna.gltf"></a-asset-item>
             <a-asset-item id="orion-model" src="assets/orion.glb"></a-asset-item>
@@ -70,53 +70,48 @@
             <img id="a2_alert_02" src="assets/a2_alert_02.png">
         </a-assets>
 
-        <!-- EL SOL (Con Lens Flare / Bloom Procedimental integrado) -->
+        <!-- EL SOL (Iluminación Astronómica Reparada) -->
         <a-entity id="sun" position="-500 0 -500" solar-flare>
             <a-sphere radius="10" material="color: #ffffff; shader: flat;"></a-sphere>
-            <a-light type="point" color="#ffffff" intensity="2" distance="3000" decay="0.5"></a-light>
-        </a-entity>
-        <!-- Luz ambiental tenue para ver la parte oscura de los planetas -->
-        <a-light type="ambient" color="#0a0a1a" intensity="0.5"></a-light>
-
-        <!-- LA TIERRA (.glb + Inclinación Orbital + Raycaster) -->
-        <!-- La clase 'clickable' permite que el raycaster la detecte para usar Numpad (.) y Alt+Click -->
-        <a-entity id="earth-container" position="-0.03 0 0" rotation="23.5 0 0">
-            <!-- HITBOX: Esfera transparente matemáticamente perfecta para el clic -->
-            <a-sphere id="hitbox-earth" class="clickable" data-name="TIERRA" radius="0.08" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
             
-            <a-entity gltf-model="#earth-model" scale="0.12756 0.12756 0.12756" 
-                      animation="property: rotation; to: 0 360 0; loop: true; dur: 864000; easing: linear">
-            </a-entity>
-
-            <!-- LETRERO DINÁMICO (Crece y decrece según la distancia) -->
-            <a-entity dynamic-label="text: EARTH; baseScale: 0.1" position="0 0.12 0"></a-entity>
-        </a-entity>
-
-        <!-- LA LUNA (.glb + Hitbox + Letrero Dinámico) -->
-        <a-entity id="moon-container" position="3.844 0 0" rotation="1.54 0 0">
-            <!-- HITBOX LUNA -->
-            <a-sphere id="hitbox-moon" class="clickable" data-name="LUNA" radius="0.025" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
-            
-            <a-entity gltf-model="#moon-model" scale="0.03474 0.03474 0.03474"
-                      animation="property: rotation; to: 0 360 0; loop: true; dur: 2332800; easing: linear">
-            </a-entity>
-
-            <!-- LETRERO DINÁMICO LUNA -->
-            <a-entity dynamic-label="text: MOON; baseScale: 0.1" position="0 0.05 0"></a-entity>
-        </a-entity>
-
-        <!-- NAVE ORION (+ Hitbox + Letrero) -->
-        <a-entity id="orion-ship" position="0.1 0 0">
-            <!-- HITBOX NAVE -->
-            <a-sphere id="hitbox-orion" class="clickable" data-name="ORION" radius="0.02" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
-            
-            <a-entity gltf-model="#orion-model" scale="0.005 0.005 0.005"></a-entity>
-            
-            <!-- LETRERO DINÁMICO NAVE -->
-            <a-entity dynamic-label="text: ORION; baseScale: 0.05" position="0 0.03 0"></a-entity>
+            <!-- decay="0" evita que la luz muera en el viaje de 1,496 unidades hasta la Tierra -->
+            <a-light type="directional" color="#ffffff" intensity="3" distance="0" decay="0"></a-light>
         </a-entity>
         
-            <!-- Alerta e instrucciones -->
+        <a-light type="ambient" color="#0a0a1a" intensity="0.5"></a-light>
+
+        <!-- SISTEMA LOCAL TIERRA-LUNA (El universo se moverá a su alrededor) -->
+        <a-entity id="earth-system" position="0 0 0">
+            
+            <!-- LA TIERRA (Animación removida. La rotación ahora la dicta la mecánica orbital UTC) -->
+            <a-entity id="earth-container" position="-0.03 0 0" rotation="23.5 0 0">
+                <a-sphere id="hitbox-earth" class="clickable" data-name="TIERRA" radius="0.08" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
+                <a-entity gltf-model="#earth-model" scale="0.12756 0.12756 0.12756"></a-entity>
+                <a-entity dynamic-label="text: EARTH; baseScale: 0.1" position="0 0.12 0"></a-entity>
+            </a-entity>
+
+            <!-- LA LUNA (Animación removida. Posición y fase controlada por Efemérides) -->
+            <a-entity id="moon-container" position="3.844 0 0" rotation="1.54 0 0">
+                <a-sphere id="hitbox-moon" class="clickable" data-name="LUNA" radius="0.025" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
+                <a-entity gltf-model="#moon-model" scale="0.03474 0.03474 0.03474"></a-entity>
+                <a-entity dynamic-label="text: MOON; baseScale: 0.1" position="0 0.05 0"></a-entity>
+            </a-entity>
+
+            <!-- NAVE ORION (Con Geometría Fallback por si falla el .glb) -->
+            <a-entity id="orion-ship" position="0.1 0 0">
+                <a-sphere id="hitbox-orion" class="clickable" data-name="ORION" radius="0.02" material="opacity: 0; transparent: true; depthWrite: false;"></a-sphere>
+                
+                <!-- Fallback Primitive: Visible si el modelo falla. Si el .gltf carga, se superpone. -->
+                <a-cone color="#C0C0C0" radius-bottom="0.005" height="0.01" rotation="-90 0 0"></a-cone>
+                <a-cylinder color="#3366ff" radius="0.006" height="0.002" position="0 0 0.005"></a-cylinder>
+
+                <a-entity gltf-model="#orion-model" scale="0.005 0.005 0.005"></a-entity>
+                <a-entity dynamic-label="text: ORION; baseScale: 0.05" position="0 0.03 0"></a-entity>
+            </a-entity>
+
+        </a-entity>
+        
+        <!-- Alerta e instrucciones visuales -->
         <a-entity>
             <a-image src="#a2_alert_01" scale="1.8 1.5 1.8" position="0 -1.5 3 " rotation="270 0 0"></a-image>
             <a-image src="#a2_alert_02" scale="1.5 1.8 1.8" position="1.5 -.45 3" rotation="0 270 0"></a-image>

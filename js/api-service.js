@@ -1,79 +1,73 @@
-/**
- * Servicio de Telemetría AROW - Arquitectura Determinista basada en Tiempo UTC
- */
 class ArowService {
     constructor() {
-        // Endpoint teórico esperado para AROW Artemis II. Puede variar según los protocolos de NASA hoy.
         this.apiUrl = 'https://client.arow.nasa.gov/api/v1/telemetry/latest';
         this.isSimulating = true;
+        this.apiFailedAttempts = 0; 
+        this.apiDead = false;       
         
-        // HORA CERO EXACTA: 1 de Abril de 2026 (Ajusta la hora UTC según el despegue oficial)
-        // Ejemplo: 14:00:00 UTC
         this.launchDateMs = new Date('2026-04-01T14:00:00Z').getTime();
-        
-        // Duración teórica de la misión Artemis II: ~10 días en milisegundos
         this.missionDurationMs = 10 * 24 * 60 * 60 * 1000; 
     }
 
     async fetchTelemetry() {
+        if (this.apiDead) return this.getDeterministicState(Date.now());
+
         try {
-            // Intentamos conectar con la telemetría en vivo. 'cache: no-store' evita datos viejos.
             const response = await fetch(this.apiUrl, { cache: "no-store" });
-            if (!response.ok) throw new Error('API AROW inaccesible o bloqueada por CORS');
-            
+            if (!response.ok) throw new Error('API bloqueada');
             const data = await response.json();
             this.isSimulating = false;
-            
-            return {
-                x: data.x, y: data.y, z: data.z,
-                distEarth: data.distanceFromEarth,
-                distMoon: data.distanceFromMoon,
-                speed: data.relativeVelocity
-            };
+            return { x: data.x, y: data.y, z: data.z, distEarth: data.distanceFromEarth, distMoon: data.distanceFromMoon, speed: data.relativeVelocity };
         } catch (error) {
-            // Si la API falla (lo más probable en un entorno frontend sin proxy), 
-            // entra el Simulador Determinista de precisión temporal.
+            this.apiFailedAttempts++;
+            if (this.apiFailedAttempts >= 3) {
+                console.warn("[SISTEMA] Conexión AROW abortada tras 3 fallos. Modo UTC Determinista activado.");
+                this.apiDead = true;
+            }
             this.isSimulating = true;
             return this.getDeterministicState(Date.now());
         }
     }
 
-    /**
-     * Calcula la posición exacta de la nave basándose estrictamente en el reloj mundial.
-     * @param {number} currentTimeMs - Timestamp actual
-     */
     getDeterministicState(currentTimeMs) {
         let elapsedMs = currentTimeMs - this.launchDateMs;
-
-        // 1. Si aún no hemos despegado (antes de la hora cero)
-        if (elapsedMs < 0) {
-            return { x: 0.1, y: 0, z: 0, distEarth: 0, distMoon: 384400, speed: 0 };
-        }
-
-        // 2. Si la misión ya terminó (Splashdown)
-        if (elapsedMs > this.missionDurationMs) {
-            return { x: 0.1, y: 0, z: 0, distEarth: 0, distMoon: 384400, speed: 0 };
-        }
-
-        // 3. Mapeo del progreso (t va de 0 a 1 durante los 10 días)
         let t = elapsedMs / this.missionDurationMs;
-        let pi = Math.PI;
+        
+        if (t < 0) t = 0;
+        if (t > 1) t = 1;
 
-        // Ecuaciones paramétricas de la "Free-Return Trajectory" ajustadas a 10 días
-        // El punto más lejano (apogeo lunar) ocurre aproximadamente a la mitad (t = ~0.4 a 0.5)
-        let x = Math.sin(t * pi) * 400000;       // Llega hasta 400,000 km y vuelve a 0
-        let y = Math.sin(t * 2 * pi) * 40000;    // Dibuja el arco del "8" en el eje Y
-        let z = Math.sin(t * pi) * 15000;        // Inclinación orbital respecto a la eclíptica
+        let flybyTimeMs = this.launchDateMs + (this.missionDurationMs * 0.5);
+        let moonFlybyPos = window.physicsEngine ? 
+            window.physicsEngine.getLunarGeocentricPosition(flybyTimeMs) : 
+            new THREE.Vector3(3.844, 0, 0);
+
+        let scale = 100000;
+        let targetX = moonFlybyPos.x * scale;
+        let targetY = moonFlybyPos.y * scale;
+        let targetZ = moonFlybyPos.z * scale;
+
+        // --- CORRECCIÓN VECTORIAL HORIZONTAL (X-Z) ---
+        let dir = new THREE.Vector3(targetX, targetY, targetZ).normalize();
+        // El vector perpendicular extrae el componente 'y' y cruza X con Z para que la curva sea acostada
+        let perp = new THREE.Vector3(-dir.z, 0, dir.x).normalize();
+
+        let progressRadius = Math.sin(t * Math.PI) * 400000;
+        let bulge = Math.sin(t * 2 * Math.PI) * 150000;
+
+        // El componente 'y' (altura) solo sufre una leve variación debido a la inclinación de la órbita (5.14°)
+        let x = (dir.x * progressRadius) + (perp.x * bulge);
+        let y = (dir.y * progressRadius) + (Math.sin(t * Math.PI) * 20000);
+        let z = (dir.z * progressRadius) + (perp.z * bulge);
 
         let distEarth = Math.sqrt(x*x + y*y + z*z);
-        // Distancia a la luna (centro lunar en X = 384400, Y = 0, Z = 0)
-        let distMoon = Math.sqrt(Math.pow(384400 - x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
 
-        // Cálculo de velocidad (mayor cerca de la Tierra ~39000 km/h, menor cerca de la Luna ~5000 km/h)
-        let speed = 40000 - (Math.abs(Math.sin(t * pi)) * 35000);
+        let currentMoonPos = window.physicsEngine ? window.physicsEngine.getLunarGeocentricPosition(currentTimeMs) : moonFlybyPos;
+        let mx = currentMoonPos.x * scale, my = currentMoonPos.y * scale, mz = currentMoonPos.z * scale;
+        let distMoon = Math.sqrt(Math.pow(mx - x, 2) + Math.pow(my - y, 2) + Math.pow(mz - z, 2));
 
-        return { x: x, y: y, z: z, distEarth: distEarth, distMoon: distMoon, speed: speed };
+        let speed = 40000 - (Math.abs(Math.sin(t * Math.PI)) * 34000);
+
+        return { x, y, z, distEarth, distMoon, speed };
     }
 }
-
 window.arowService = new ArowService();

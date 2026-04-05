@@ -169,3 +169,70 @@ AFRAME.registerComponent('blender-controls', {
             "VR/PC NAVIGATION: Hold Left Click to aim | <strong>WASD</strong> to move | <strong>Orbit</strong> scroll click | Click en planeta para seleccionar.";
     }
 });
+
+// 4. COMPONENTE: PERSISTENCIA DE CÁMARA (SessionStorage)
+AFRAME.registerComponent('persist-camera', {
+    init: function () {
+        this.cameraEl = document.querySelector('#camera');
+        
+        // Cargar estado al iniciar
+        let savedState = sessionStorage.getItem('artemisCameraState');
+        if (savedState) {
+            let state = JSON.parse(savedState);
+            this.el.setAttribute('position', state.pos); // Mover el Rig
+            
+            // Para rotar la cámara en A-Frame, debemos alterar los objetos Pitch y Yaw de look-controls
+            let lookControls = this.cameraEl.components['look-controls'];
+            if (lookControls) {
+                lookControls.pitchObject.rotation.x = state.rotX;
+                lookControls.yawObject.rotation.y = state.rotY;
+            }
+        }
+    },
+    tick: function () {
+        // Guardar estado de forma continua pero ligera
+        let lookControls = this.cameraEl.components['look-controls'];
+        if (lookControls) {
+            let currentState = {
+                pos: this.el.getAttribute('position'),
+                rotX: lookControls.pitchObject.rotation.x,
+                rotY: lookControls.yawObject.rotation.y
+            };
+            sessionStorage.setItem('artemisCameraState', JSON.stringify(currentState));
+        }
+    }
+});
+
+// 5. COMPONENTE: NAVEGACIÓN TÁCTIL MÓVIL Y VR
+AFRAME.registerComponent('touch-movement', {
+    schema: { speed: { default: 0.15 } }, // Velocidad de avance al tocar
+    init: function () {
+        this.isMoving = false;
+        this.cameraEl = document.querySelector('#camera');
+        this.direction = new THREE.Vector3();
+
+        // Detectar dedo en pantalla
+        window.addEventListener('touchstart', (e) => {
+            // Ignorar el toque si el usuario está pulsando un botón de la UI
+            if (e.target.closest('#ui-container') || e.target.closest('#instructions')) return;
+            this.isMoving = true;
+        }, {passive: false});
+
+        // Detener al soltar
+        window.addEventListener('touchend', () => {
+            this.isMoving = false;
+        });
+    },
+    tick: function (time, delta) {
+        if (this.isMoving && this.cameraEl) {
+            // Obtener el vector hacia el cual está mirando el celular/gafas VR
+            this.cameraEl.object3D.getWorldDirection(this.direction);
+            
+            // En Three.js, el frente de la cámara es el eje Z negativo (-1)
+            this.direction.multiplyScalar(-this.data.speed * (delta / 16));
+            
+            // Sumar el vector a la posición actual del Rig
+            this.el.object3D.position.add(this.direction);
+        }
+    }
+});

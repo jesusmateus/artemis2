@@ -32,6 +32,20 @@
             if(e.ctrlKey && e.keyCode == 85) return false; // disable U key
         }
     </script>
+    <script>
+        // Habilitador de Experiencia y Audio
+        window.addEventListener('DOMContentLoaded', () => {
+            const startBtn = document.getElementById('start-btn');
+            const startScreen = document.getElementById('start-screen');
+            const music = document.getElementById('space-music');
+            
+            startBtn.addEventListener('click', () => {
+                startScreen.remove(); // Eliminación total del nodo DOM para no bloquear el Touch
+                music.volume = 0.5;
+                music.play().catch(e => console.warn("Audio bloqueado", e));
+            });
+        });
+    </script>
 </head>
 <body>
     
@@ -48,7 +62,7 @@
 
     <!-- Instrucciones de Navegación -->
     <div id="instructions">
-        <strong>Press F5</strong> to Refresh | <strong>VR/PC NAVIGATION:</strong> Hold Left Click to aim | <strong>WASD:</strong> to move | Click on planet to select | <strong>ORBIT:</strong> scroll click | <strong>Autor</strong> Jesús Mateus
+        <strong>Press F5</strong> to Refresh | <strong>VR/PC NAVIGATION:</strong> Hold Left Click to aim | <strong>WASD:</strong> to move | Click on planet to select | <strong>ORBIT:</strong> scroll click | <strong>Autor:</strong> Jesús Mateus
     </div>
 
     <!-- ESCENA A-FRAME (Atributo cosmic-environment añadido) -->
@@ -118,7 +132,7 @@
         </a-entity>
 
         <!-- CÁMARA VR / NAVEGACIÓN -->
-        <a-entity id="rig" position="0 -1.5 3">
+        <a-entity id="rig" position="0 -1.5 3" persist-camera touch-movement="speed: 0.15">
             <a-camera id="camera" look-controls="pointerLockEnabled: false" wasd-controls="fly: true; acceleration: 15"></a-camera>
         </a-entity>
 

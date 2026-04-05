@@ -1,5 +1,11 @@
+/**
+ * Componente de Rastreo y Renderizado de Trayectoria Suavizada (Spline)
+ */
 AFRAME.registerComponent('artemis-tracker', {
-    schema: { scaleFactor: {type: 'number', default: 100000}, updateInterval: {type: 'number', default: 3000} },
+    schema: { 
+        scaleFactor: {type: 'number', default: 100000}, 
+        updateInterval: {type: 'number', default: 3000} 
+    },
 
     init: function () {
         this.ship = document.querySelector('#orion-ship');
@@ -7,16 +13,13 @@ AFRAME.registerComponent('artemis-tracker', {
         this.lastFetchTime = 0;
         
         // DOS TRAYECTORIAS SEPARADAS (Pasado y Futuro)
-        this.pastPoints =[];
-        this.futurePoints =[];
-
-        // Geometría Pasada (Línea Roja sólida)
         this.pastGeom = new THREE.BufferGeometry();
-        this.pastLine = new THREE.Line(this.pastGeom, new THREE.LineBasicMaterial({ color: 0xff3300, linewidth: 2 }));
+        // Naranja Dorado para la ruta completada (Histórico)
+        this.pastLine = new THREE.Line(this.pastGeom, new THREE.LineBasicMaterial({ color: 0xffaa00, linewidth: 2 }));
         
-        // Geometría Futura (Línea Cyan translúcida)
         this.futureGeom = new THREE.BufferGeometry();
-        this.futureLine = new THREE.Line(this.futureGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3 }));
+        // Cyan translúcido para la ruta proyectada (Futuro)
+        this.futureLine = new THREE.Line(this.futureGeom, new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.35 }));
         
         this.el.sceneEl.object3D.add(this.pastLine);
         this.el.sceneEl.object3D.add(this.futureLine);
@@ -38,6 +41,7 @@ AFRAME.registerComponent('artemis-tracker', {
             this.lastFetchTime = time;
         }
 
+        // Interpolación fluida (Lerp) de la nave
         if (this.ship && this.ship.object3D) {
             this.ship.object3D.position.lerp(this.targetPosition, 0.05);
         }
@@ -58,33 +62,44 @@ AFRAME.registerComponent('artemis-tracker', {
         let duration = window.arowService.missionDurationMs;
         let scale = this.data.scaleFactor;
         
-        let intervals = 600; // Resolución del dibujo
+        let rawPastPoints =[];
+        let rawFuturePoints =[];
+        let intervals = 400; // Puntos de anclaje base
         let stepMs = duration / intervals;
 
+        // 1. Extraer los datos matemáticos
         for (let i = 0; i <= intervals; i++) {
             let timeSim = launch + (stepMs * i);
             let state = window.arowService.getDeterministicState(timeSim);
             let pos = new THREE.Vector3(state.x / scale, state.y / scale, state.z / scale);
 
             if (timeSim <= now) {
-                this.pastPoints.push(pos);
+                rawPastPoints.push(pos);
             } else {
-                this.futurePoints.push(pos);
+                rawFuturePoints.push(pos);
             }
         }
-        
-        // Actualizar los Buffers de WebGL
-        this.pastGeom.setFromPoints(this.pastPoints);
-        
-        // Para que las líneas conecten, el primer punto futuro es el último del pasado
-        if (this.pastPoints.length > 0) {
-            this.futurePoints.unshift(this.pastPoints[this.pastPoints.length - 1]);
+
+        // Para evitar cortes, unimos la línea futura exactamente donde termina la pasada
+        if (rawPastPoints.length > 0 && rawFuturePoints.length > 0) {
+            rawFuturePoints.unshift(rawPastPoints[rawPastPoints.length - 1]);
         }
-        this.futureGeom.setFromPoints(this.futurePoints);
         
-        // Ubicar la nave en el tiempo presente (final de la línea roja)
-        if (this.pastPoints.length > 0) {
-            let currentRealPos = this.pastPoints[this.pastPoints.length - 1];
+        // 2. INGENIERÍA GRÁFICA: Splines de Catmull-Rom para suavizado perfecto
+        if (rawPastPoints.length > 1) {
+            const pastCurve = new THREE.CatmullRomCurve3(rawPastPoints);
+            // Genera 1000 vértices perfectamente curvos entre los anclajes
+            this.pastGeom.setFromPoints(pastCurve.getPoints(1000)); 
+        }
+
+        if (rawFuturePoints.length > 1) {
+            const futureCurve = new THREE.CatmullRomCurve3(rawFuturePoints);
+            this.futureGeom.setFromPoints(futureCurve.getPoints(1000));
+        }
+        
+        // Ubicar la nave en el último punto del pasado
+        if (rawPastPoints.length > 0) {
+            let currentRealPos = rawPastPoints[rawPastPoints.length - 1];
             this.ship.object3D.position.copy(currentRealPos);
             this.targetPosition.copy(currentRealPos);
         }
@@ -93,7 +108,7 @@ AFRAME.registerComponent('artemis-tracker', {
     updateUIStatus: function() {
         if (!this.uiStatus) return;
         if (window.arowService.isSimulating) {
-            this.uiStatus.innerText = "UTC CALCULATION (AROW API Blocked/Offline)";
+            this.uiStatus.innerText = "UTC DETERMINISTIC CALCULATION (Telemetry API Offline)";
             this.uiStatus.style.color = "#ff9900"; 
         } else {
             this.uiStatus.innerText = "LIVE DATA (AROW Connected)";

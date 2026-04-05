@@ -33,6 +33,8 @@ El proyecto está diseñado para ser alojado estáticamente en plataformas como 
 *   Las efemérides matemáticas y el modelo vectorial de inyección translunar están basados en la documentación pública de trayectorias de retorno libre del programa Artemis (NASA).
 *   Texturas y modelados de dominio público vía NASA 3D Resources.
 
+ **Firma de Vuelo Precisa y Suavizado Spline ($C^1$ Continuity):** La simulación recrea la órbita terrestre altamente elíptica (HEO) y la inyección translunar mediante Ecuaciones Paramétricas Continuas. Para el renderizado WebGL, se ha implementado `THREE.CatmullRomCurve3`, convirtiendo los vectores analíticos en *Splines* perfectamente suaves, diferenciando la ruta completada (Dorado) de la proyectada (Cyan) basándose en el Epoch UTC actual.
+
 ## 📂 Estructura del Proyecto
 
 ```text
